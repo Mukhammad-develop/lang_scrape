@@ -16,12 +16,14 @@ A comprehensive news scraping application for Indonesian news websites. This app
 
 ```
 id/
-├── news_scraper.py     # News scraping mini-app
-├── jsonl_handler.py    # JSONL processing mini-app
-├── main.py            # Main application entry point
-├── requirements.txt   # Python dependencies
-├── README.md         # This file
-└── output/           # Generated output files (created automatically)
+├── news_scraper.py        # News scraping mini-app
+├── jsonl_handler.py       # JSONL processing mini-app
+├── main.py               # Main application entry point
+├── continuous_scraper.py  # 🔥 CONTINUOUS scraper - never stops!
+├── run_continuous.py     # Simple launcher for continuous mode
+├── requirements.txt      # Python dependencies
+├── README.md            # This file
+└── output/              # Generated output files (created automatically)
 ```
 
 ## Installation
@@ -35,10 +37,22 @@ id/
 
 ## Usage
 
-### Basic Usage
+### 🔥 CONTINUOUS MODE (Recommended)
+
+**Never stops, only scrapes NEW content, avoids duplicates:**
 
 ```bash
-# Scrape 10 articles from Detik (default)
+# Simple continuous scraping (both sites)
+python run_continuous.py
+
+# Advanced continuous scraping
+python continuous_scraper.py --sites detik kompas --batch-size 30
+```
+
+### Basic One-Time Usage
+
+```bash
+# Scrape 50 articles from Detik (default)
 python main.py
 
 # Scrape 20 articles from Detik
@@ -151,32 +165,54 @@ Manages data processing and output:
 - Schema validation
 - Statistical analysis
 
+## 🔥 Continuous Scraper Features
+
+The **continuous scraper** is the most powerful mode:
+
+### ✅ **Smart Features:**
+- **Never stops** - Runs 24/7 until you stop it
+- **No duplicates** - Automatically checks existing JSONL files
+- **Deep pagination** - Goes through 50+ pages per site section
+- **Multiple sections** - Scrapes from 7 Detik sections + 7 Kompas sections
+- **Batch processing** - Processes articles in manageable batches
+- **Automatic recovery** - Continues even if individual articles fail
+- **Cycle-based** - Completes full cycles then waits before starting again
+
+### 🎯 **Coverage:**
+- **Detik**: 7 sections × 50 pages = up to 3,500+ pages checked
+- **Kompas**: 7 sections × 30 pages = up to 2,100+ pages checked  
+- **Total**: 5,600+ pages checked per cycle!
+
+### 🚀 **How to Run:**
+
+```bash
+# Simple start (recommended)
+python run_continuous.py
+
+# Custom settings
+python continuous_scraper.py --sites detik --batch-size 50 --min-delay 0.5
+```
+
 ## Examples
 
-### Example 1: Quick Start
+### Example 1: Continuous Scraping (BEST)
 ```bash
-python main.py --site detik --max-articles 5
+# Start continuous scraping - will run forever
+python run_continuous.py
 ```
 
-### Example 2: Production Scraping
+### Example 2: One-time Bulk Scraping
 ```bash
-python main.py \
-  --site detik \
-  --max-articles 100 \
-  --output detik_news_$(date +%Y%m%d).jsonl \
-  --min-delay 2.0 \
-  --max-delay 4.0 \
-  --validate \
-  --verbose
+python main.py --bulk-mode --site detik --max-articles 200
 ```
 
-### Example 3: Multiple Sites
+### Example 3: Custom Continuous Settings
 ```bash
-# Scrape from Detik
-python main.py --site detik --max-articles 50 --output detik_news.jsonl
-
-# Scrape from Kompas
-python main.py --site kompas --max-articles 50 --output kompas_news.jsonl
+python continuous_scraper.py \
+  --sites detik kompas \
+  --batch-size 30 \
+  --min-delay 0.8 \
+  --max-delay 2.0
 ```
 
 ## Error Handling
