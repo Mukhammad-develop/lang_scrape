@@ -42,22 +42,13 @@ class FixedContinuousNewsScraper:
         self.sites_config = {
             'detik': {
                 'base_urls': [
-                    'https://news.detik.com/berita',
-                    'https://news.detik.com/berita-jawa-barat', 
-                    'https://news.detik.com/berita-jawa-tengah',
-                    'https://news.detik.com/berita-jawa-timur',
-                    'https://news.detik.com/pemilu',
-                    'https://news.detik.com/kolom',
-                    'https://news.detik.com/internasional',
-                    'https://finance.detik.com/berita-ekonomi-bisnis',
-                    'https://sport.detik.com/sepakbola',
-                    'https://oto.detik.com/berita'
+                    'https://news.detik.com/indeks',  # CORRECT: Main index page
                 ],
-                'pagination_pattern': '/{page}',  # FIXED: Detik uses /2, /3, etc
-                'max_pages_per_url': 50,
-                'article_selector': 'article.list-content__item, .media__link',
-                'title_selector': 'h3.media__title a, h2.media__title a, .media__title a',
-                'link_selector': 'h3.media__title a, h2.media__title a, .media__title a'
+                'pagination_pattern': '?page={page}',  # CORRECT: Uses ?page=1, ?page=2, etc
+                'max_pages_per_url': 500,  # CORRECT: Goes up to page 500
+                'article_selector': 'h3, h2, .media, article',  # Target the headline containers
+                'title_selector': 'a',  # Get the link inside the headline
+                'link_selector': 'a'    # Same as title selector
             },
             'kompas': {
                 'base_urls': [
@@ -197,11 +188,8 @@ class FixedContinuousNewsScraper:
                     logger.info(f"✅ Target reached! Found {len(all_new_articles)} new articles")
                     break
                 
-                # FIXED pagination URL construction
-                if page_num == 1:
-                    paginated_url = base_url  # First page is usually the base URL
-                else:
-                    paginated_url = base_url + config['pagination_pattern'].replace('{page}', str(page_num))
+                # CORRECT pagination URL construction for Detik
+                paginated_url = base_url + config['pagination_pattern'].replace('{page}', str(page_num))
                 
                 # Get articles from this page
                 page_articles = self.discover_urls_from_page(paginated_url, site)
