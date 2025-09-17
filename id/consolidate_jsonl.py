@@ -29,16 +29,73 @@ class JSONLConsolidator:
         
         # Required fields to keep
         self.required_fields = {'id', 'language', 'source_url', 'title', 'text', 'clean_status', 'category'}
+        
+        # Spam text patterns to remove
+        self.spam_patterns = [
+            'SCROLL TO CONTINUE WITH CONTENT',
+            'ADVERTISEMENT',
+            'Baca juga:',
+            'Simak juga Video:',
+            '[Gambas:Video 20detik]',
+            'Halaman 2 dari 2',
+            'detikcom',
+            '(', ')',  # Remove source citations like (akd/akd), (haf/haf), etc.
+        ]
+    
+    def clean_text(self, text: str) -> str:
+        """Clean text content by removing spam patterns"""
+        if not text:
+            return ""
+        
+        cleaned_text = text
+        
+        # Remove spam patterns
+        for pattern in self.spam_patterns:
+            cleaned_text = cleaned_text.replace(pattern, "")
+        
+        # Remove multiple spaces and clean up
+        cleaned_text = ' '.join(cleaned_text.split())
+        
+        # Remove citation patterns like (akd/akd), (haf/haf), etc.
+        import re
+        cleaned_text = re.sub(r'\([a-z]{2,4}/[a-z]{2,4}\)$', '', cleaned_text)
+        cleaned_text = re.sub(r'\([a-z]{2,4}/[a-z]{2,4}\)', '', cleaned_text)
+        
+        # Remove leftover patterns from cleaning
+        cleaned_text = re.sub(r'\s+', ' ', cleaned_text)  # Multiple spaces
+        cleaned_text = re.sub(r'^\s*-\s*', '', cleaned_text)  # Leading dash
+        cleaned_text = re.sub(r'\s*akd/akd\s*', '', cleaned_text)
+        cleaned_text = re.sub(r'\s*haf/haf\s*', '', cleaned_text)
+        cleaned_text = re.sub(r'\s*nvc/idh\s*', '', cleaned_text)
+        cleaned_text = re.sub(r'\s*rfs/imk\s*', '', cleaned_text)
+        cleaned_text = re.sub(r'\s*rdp/tor\s*', '', cleaned_text)
+        
+        # Remove tag-like patterns at the end
+        cleaned_text = re.sub(r'\s+[a-z\s]+$', lambda m: '' if len(m.group().strip().split()) <= 5 else m.group(), cleaned_text)
+        
+        return cleaned_text.strip()
     
     def clean_article(self, article: Dict) -> Dict:
-        """Remove unwanted fields and keep only required ones"""
-        cleaned = {}
+        """Remove unwanted fields and keep only required ones in proper order"""
+        # Don't clean text - keep original
+        original_text = article.get("text", "")
         
+        # Create clean article with proper field order
+        cleaned = {
+            "id": article.get("id", ""),
+            "language": article.get("language", "id"),
+            "source_url": article.get("source_url", ""),
+            "title": article.get("title", ""),
+            "text": original_text,
+            "clean_status": article.get("clean_status", "clean"),
+            "category": article.get("category", "news")
+        }
+        
+        # Validate required fields
         for field in self.required_fields:
-            if field in article:
-                cleaned[field] = article[field]
-            else:
-                logger.warning(f"Missing required field '{field}' in article: {article.get('source_url', 'unknown')}")
+            if not cleaned[field]:
+                logger.warning(f"Empty required field '{field}' in article: {article.get('source_url', 'unknown')}")
+                return None
                 
         return cleaned
     
@@ -74,18 +131,14 @@ class JSONLConsolidator:
                             article = json.loads(line.strip())
                             self.total_processed += 1
                             
-                            # Check for duplicates using source_url
+                            # Don't check for duplicates - keep ALL articles
                             source_url = article.get('source_url', '')
-                            if source_url in self.seen_urls:
-                                self.duplicates_removed += 1
-                                continue
                             
                             # Clean the article (remove unwanted fields)
                             cleaned_article = self.clean_article(article)
                             
-                            if cleaned_article and source_url:
+                            if cleaned_article:
                                 consolidated_articles.append(cleaned_article)
-                                self.seen_urls.add(source_url)
                                 
                         except json.JSONDecodeError as e:
                             logger.warning(f"Invalid JSON in {jsonl_file} line {line_num}: {e}")
