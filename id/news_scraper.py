@@ -28,17 +28,29 @@ class IndonesianNewsScraper:
         self.news_sites = {
             'detik': {
                 'base_url': 'https://news.detik.com',
+                'additional_pages': [
+                    'https://news.detik.com/berita',
+                    'https://news.detik.com/berita-jawa-barat',
+                    'https://news.detik.com/berita-jawa-tengah',
+                    'https://news.detik.com/berita-jawa-timur'
+                ],
                 'article_selector': 'article.list-content__item',
                 'title_selector': 'h3.media__title a',
                 'link_selector': 'h3.media__title a',
-                'content_selectors': ['.detail__body-text', '.itp_bodycontent']
+                'content_selectors': ['.detail__body-text', '.itp_bodycontent', 'div.detail__body-text']
             },
             'kompas': {
                 'base_url': 'https://www.kompas.com',
+                'additional_pages': [
+                    'https://nasional.kompas.com',
+                    'https://regional.kompas.com',
+                    'https://megapolitan.kompas.com',
+                    'https://internasional.kompas.com'
+                ],
                 'article_selector': '.article__list .article__item',
                 'title_selector': '.article__title a',
                 'link_selector': '.article__title a',
-                'content_selectors': ['.read__content', '.artikel-content']
+                'content_selectors': ['.read__content', '.artikel-content', 'div.read__content']
             }
         }
     
@@ -49,43 +61,69 @@ class IndonesianNewsScraper:
         
         site_config = self.news_sites[site]
         articles = []
+        seen_urls = set()  # Avoid duplicates
         
-        try:
-            response = self.session.get(site_config['base_url'])
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            article_elements = soup.select(site_config['article_selector'])
-            
-            logger.info(f"Found {len(article_elements)} articles on {site}")
-            
-            for element in article_elements[:max_articles]:
-                try:
-                    title_elem = element.select_one(site_config['title_selector'])
-                    link_elem = element.select_one(site_config['link_selector'])
-                    
-                    if title_elem and link_elem:
-                        title = title_elem.get_text(strip=True)
-                        link = link_elem.get('href')
+        # Collect URLs to scrape from
+        urls_to_scrape = [site_config['base_url']]
+        if 'additional_pages' in site_config:
+            urls_to_scrape.extend(site_config['additional_pages'])
+        
+        logger.info(f"Scraping from {len(urls_to_scrape)} pages for {site}")
+        
+        for page_url in urls_to_scrape:
+            if len(articles) >= max_articles:
+                break
+                
+            try:
+                logger.info(f"Scraping page: {page_url}")
+                response = self.session.get(page_url)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.content, 'html.parser')
+                article_elements = soup.select(site_config['article_selector'])
+                
+                logger.info(f"Found {len(article_elements)} articles on {page_url}")
+                
+                for element in article_elements:
+                    if len(articles) >= max_articles:
+                        break
                         
-                        # Make sure link is absolute
-                        if link and not link.startswith('http'):
-                            link = urljoin(site_config['base_url'], link)
+                    try:
+                        title_elem = element.select_one(site_config['title_selector'])
+                        link_elem = element.select_one(site_config['link_selector'])
                         
-                        if title and link:
-                            articles.append({
-                                'title': title,
-                                'source_url': link,
-                                'site': site
-                            })
+                        if title_elem and link_elem:
+                            title = title_elem.get_text(strip=True)
+                            link = link_elem.get('href')
                             
-                except Exception as e:
-                    logger.warning(f"Error parsing article element: {e}")
-                    continue
-                    
-        except Exception as e:
-            logger.error(f"Error fetching news list from {site}: {e}")
-            
+                            # Make sure link is absolute
+                            if link and not link.startswith('http'):
+                                link = urljoin(page_url, link)
+                            
+                            # Avoid duplicates
+                            if link in seen_urls:
+                                continue
+                                
+                            if title and link:
+                                articles.append({
+                                    'title': title,
+                                    'source_url': link,
+                                    'site': site
+                                })
+                                seen_urls.add(link)
+                                
+                    except Exception as e:
+                        logger.warning(f"Error parsing article element: {e}")
+                        continue
+                        
+                # Add small delay between pages
+                time.sleep(1)
+                        
+            except Exception as e:
+                logger.error(f"Error fetching news list from {page_url}: {e}")
+                continue
+                
+        logger.info(f"Collected {len(articles)} unique articles from {site}")
         return articles
     
     def scrape_article_content(self, article_url: str, site: str) -> Optional[str]:
@@ -106,7 +144,7 @@ class IndonesianNewsScraper:
                 if content_elements:
                     for elem in content_elements:
                         # Remove script and style elements
-                        for script in elem(["script", "style", "aside", "nav"]):
+                        for script in elem(["script", "style", "aside", "nav", "header", "footer", "ad"]):
                             script.decompose()
                         
                         text = elem.get_text(separator=' ', strip=True)
@@ -116,13 +154,33 @@ class IndonesianNewsScraper:
                     if content_text.strip():
                         break
             
-            # Fallback: try to find paragraphs
+            # Fallback 1: try to find article content
+            if not content_text.strip():
+                article_content = soup.find('article') or soup.find('div', class_='content')
+                if article_content:
+                    # Remove unwanted elements
+                    for unwanted in article_content(["script", "style", "aside", "nav", "header", "footer", "ad"]):
+                        unwanted.decompose()
+                    text = article_content.get_text(separator=' ', strip=True)
+                    if len(text) > 100:
+                        content_text = text
+            
+            # Fallback 2: try to find paragraphs
             if not content_text.strip():
                 paragraphs = soup.find_all('p')
                 for p in paragraphs:
                     text = p.get_text(strip=True)
                     if len(text) > 50:
                         content_text += text + " "
+            
+            # Fallback 3: try to find divs with text content
+            if not content_text.strip():
+                text_divs = soup.find_all('div')
+                for div in text_divs:
+                    text = div.get_text(strip=True)
+                    if len(text) > 200 and 'detik' not in text.lower() and 'kompas' not in text.lower():
+                        content_text = text
+                        break
             
             return content_text.strip() if content_text.strip() else None
             
@@ -171,9 +229,9 @@ def main():
     """Example usage of the news scraper"""
     scraper = IndonesianNewsScraper()
     
-    # Scrape from Detik (default)
+    # Scrape from Detik (default) - now gets more articles
     print("Scraping news from Detik.com...")
-    articles = scraper.scrape_news(site='detik', max_articles=5)
+    articles = scraper.scrape_news(site='detik', max_articles=20)
     
     for article in articles:
         print(f"\nTitle: {article['title']}")

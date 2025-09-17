@@ -147,8 +147,8 @@ Examples:
     parser.add_argument(
         '--max-articles',
         type=int,
-        default=10,
-        help='Maximum number of articles to scrape (default: 10)'
+        default=50,
+        help='Maximum number of articles to scrape (default: 50)'
     )
     
     parser.add_argument(
@@ -191,6 +191,12 @@ Examples:
         help='Enable verbose logging'
     )
     
+    parser.add_argument(
+        '--bulk-mode',
+        action='store_true',
+        help='Bulk scraping mode - get maximum articles with optimized settings'
+    )
+    
     args = parser.parse_args()
     
     # Set logging level
@@ -212,6 +218,14 @@ Examples:
     
     # Create application instance
     app = IndonesianNewsApp(args.output_dir)
+    
+    # Apply bulk mode settings
+    if args.bulk_mode:
+        args.max_articles = max(args.max_articles, 200)  # At least 200 articles
+        args.min_delay = max(args.min_delay, 0.5)  # Faster but still respectful
+        args.max_delay = max(args.max_delay, 2.0)
+        args.validate = True  # Always validate in bulk mode
+        print("🚀 BULK MODE ACTIVATED - Maximum content extraction enabled!")
     
     try:
         # Run scraping
