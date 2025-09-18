@@ -203,7 +203,7 @@ class AsyncFetcher:
         start_time = time.time()
         
         try:
-            async with self.session.get(url, **kwargs) as response:
+            async with self.session.get(url, max_redirects=self.max_redirects, **kwargs) as response:
                 response_time = time.time() - start_time
                 
                 # Check for rate limiting

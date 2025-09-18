@@ -111,7 +111,7 @@ class RobotsManager:
         robots_url = f"https://{domain}/robots.txt"
         
         try:
-            async with session.get(robots_url, timeout=10) as response:
+            async with session.get(robots_url, timeout=10, max_redirects=5) as response:
                 if response.status == 200:
                     robots_content = await response.text()
                     
