@@ -1,0 +1,75 @@
+# Core Dependencies
+aiohttp>=3.8.0
+aiofiles>=23.0.0
+requests>=2.31.0
+urllib3>=2.0.0
+
+# Configuration and CLI
+PyYAML>=6.0.0
+click>=8.1.0
+python-dotenv>=1.0.0
+
+# HTML Processing and Content Extraction
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+html5lib>=1.1
+readability-lxml>=0.8.0
+newspaper3k>=0.2.8
+trafilatura>=1.6.0
+
+# Text Processing and NLP
+langdetect>=1.0.9
+nltk>=3.8.0
+spacy>=3.6.0
+sentence-transformers>=2.2.0
+transformers>=4.33.0
+torch>=2.0.0
+
+# Data Processing and Validation
+pandas>=2.0.0
+numpy>=1.24.0
+jsonschema>=4.19.0
+pydantic>=2.3.0
+
+# Database and Storage
+sqlalchemy>=2.0.0
+redis>=4.6.0
+
+# Deduplication and Similarity
+simhash>=2.1.0
+faiss-cpu>=1.7.0
+scikit-learn>=1.3.0
+
+# Web Scraping Utilities
+selenium>=4.11.0
+webdriver-manager>=4.0.0
+
+# Async and Concurrency
+asyncpg>=0.28.0
+
+# Monitoring and Observability
+prometheus-client>=0.17.0
+structlog>=23.0.0
+loguru>=0.7.0
+
+# Image and OCR Processing
+Pillow>=10.0.0
+
+# Math and Formula Processing
+sympy>=1.12.0
+
+# HTTP and Network
+httpx>=0.24.0
+fake-useragent>=1.3.0
+
+# Data Formats
+orjson>=3.9.0
+
+# System and OS
+psutil>=5.9.0
+
+# Security and Privacy
+cryptography>=41.0.0
+
+# Emoji processing
+emoji>=2.0.0

@@ -1,0 +1,147 @@
+# Production Crawling System Configuration
+
+# Crawling Configuration
+crawler:
+  concurrency: 64
+  user_agent: "LifeTipsCrawler/1.0 (+https://example.com/bot)"
+  respect_robots: true
+  politeness_delay: 1.0  # seconds between requests per domain
+  max_retries: 3
+  retry_backoff_factor: 2.0
+  timeout: 30
+  max_redirects: 5
+
+# Domain and Rate Limiting
+domains:
+  rate_limits:
+    default: 10  # requests per minute per domain
+    high_priority: 30
+    low_priority: 5
+  budget_per_domain: 1000  # max pages per domain per day
+  seeds:
+    - "https://www.wikihow.com"
+    - "https://www.thespruce.com"
+    - "https://www.foodnetwork.com"
+    - "https://www.allrecipes.com"
+    - "https://www.realsimple.com"
+    - "https://www.goodhousekeeping.com"
+
+# Topic Classification
+topics:
+  allowed:
+    - "daily_life_tips"
+    - "cooking_techniques"
+    - "home_care"
+    - "object_usage_and_actions"
+    - "personal_care"
+    - "healthy_alternatives"
+    - "cleaning_techniques"
+    - "object_placement"
+    - "food_handling"
+    - "crafting_and_diy"
+    - "odor_removal"
+    - "food_preservation"
+    - "object_modification"
+    - "object_storage"
+    - "object_shapes_and_functions"
+    - "food_allergy_substitutions"
+    - "personal_hygiene"
+    - "carrying_objects"
+    - "food_preparation"
+    - "healthy_drinks"
+    - "food_seasoning"
+    - "reasoning_about_object_functions"
+  
+  keywords:
+    daily_life_tips: ["tip", "hack", "advice", "guide", "how to", "life hack"]
+    cooking_techniques: ["cook", "recipe", "bake", "fry", "boil", "steam", "technique"]
+    home_care: ["clean", "maintain", "repair", "organize", "home", "house"]
+    object_usage_and_actions: ["use", "operate", "handle", "manipulate", "tool"]
+    personal_care: ["hygiene", "grooming", "health", "wellness", "self-care"]
+    healthy_alternatives: ["healthy", "alternative", "substitute", "natural", "organic"]
+    cleaning_techniques: ["clean", "wash", "scrub", "sanitize", "disinfect"]
+    object_placement: ["organize", "arrange", "place", "position", "store"]
+    food_handling: ["food safety", "storage", "handling", "preparation"]
+    crafting_and_diy: ["craft", "diy", "make", "create", "build", "handmade"]
+    odor_removal: ["odor", "smell", "deodorize", "freshen", "eliminate"]
+    food_preservation: ["preserve", "store", "freeze", "can", "pickle"]
+    object_modification: ["modify", "alter", "customize", "adapt", "change"]
+    object_storage: ["store", "organize", "container", "shelf", "cabinet"]
+    object_shapes_and_functions: ["shape", "function", "purpose", "design"]
+    food_allergy_substitutions: ["allergy", "substitute", "alternative", "replace"]
+    personal_hygiene: ["hygiene", "wash", "brush", "shower", "clean"]
+    carrying_objects: ["carry", "transport", "move", "lift", "handle"]
+    food_preparation: ["prep", "prepare", "chop", "slice", "mix"]
+    healthy_drinks: ["drink", "beverage", "smoothie", "juice", "tea"]
+    food_seasoning: ["season", "spice", "flavor", "salt", "pepper"]
+    reasoning_about_object_functions: ["function", "purpose", "why", "how", "reason"]
+
+# Content Processing
+content:
+  min_length: 200  # minimum characters per entry
+  max_consecutive_linebreaks: 1
+  remove_emojis: true
+  normalize_spaces: true
+  normalize_punctuation: true
+  
+# Language Configuration
+languages:
+  allowed: ["en", "zh"]
+  detection_confidence_threshold: 0.8
+
+# Quality Gates
+quality:
+  text_accuracy_threshold: 0.95
+  table_accuracy_threshold: 0.85
+  formula_accuracy_threshold: 0.85
+  max_error_rate: 0.05
+  unicode_printable_ratio: 0.9
+  min_word_frequency_threshold: 0.001
+
+# Deduplication
+deduplication:
+  similarity_threshold: 0.05  # max allowed similarity (5%)
+  exact_hash_enabled: true
+  simhash_enabled: true
+  embedding_similarity_enabled: true
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+
+# Export Configuration
+export:
+  format: "jsonl"
+  encoding: "utf-8"
+  shard_size: 10000  # lines per shard
+  delivery_version: "V1.0"
+  atomic_rename: true
+
+# Storage Configuration
+storage:
+  data_dir: "./data"
+  cache_dir: "./cache"
+  logs_dir: "./logs"
+  shards_dir: "./output"
+  checkpoint_interval: 1000  # entries
+  
+# Database Configuration
+database:
+  type: "sqlite"  # or "redis" for larger scale
+  sqlite:
+    path: "./data/crawler.db"
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+
+# Observability
+monitoring:
+  structured_logs: true
+  log_level: "INFO"
+  metrics_enabled: true
+  health_check_port: 8080
+  prometheus_port: 9090
+
+# Performance
+performance:
+  target_entries_per_day: 1500
+  max_memory_usage: "2GB"
+  gc_threshold: 10000  # entries processed before cleanup 
