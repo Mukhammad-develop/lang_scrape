@@ -267,8 +267,8 @@ def main():
     parser.add_argument(
         '--input', 
         type=str, 
-        default='ALL_indonesian_news.jsonl',
-        help='Input JSONL file (default: ALL_indonesian_news.jsonl)'
+        default='combined_results/ALL_detik_articles_complete.jsonl',
+        help='Input JSONL file (default: combined_results/ALL_detik_articles_complete.jsonl)'
     )
     
     parser.add_argument(

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-FIXED Continuous Indonesian News Scraper
+FIXED Continuous Indonesian News Scraper - DETIK ONLY, NO DELAYS
 Actually finds NEW content instead of recycling the same articles
 """
 
 import os
-import time
 import json
 import logging
 import requests
@@ -25,54 +24,71 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class FixedContinuousNewsScraper:
-    """FIXED continuous scraper that actually finds NEW content"""
+    """FIXED continuous scraper - DETIK ONLY, NO DELAYS"""
     
-    def __init__(self, output_dir: str = "output", delay_range: tuple = (1, 3)):
+    def __init__(self, output_dir: str = "output"):
         self.scraper = IndonesianNewsScraper()
         self.jsonl_handler = JSONLHandler(output_dir)
         self.output_dir = output_dir
-        self.delay_range = delay_range
         self.scraped_urls: Set[str] = set()
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         
-        # FIXED site configurations with CORRECT pagination
+        # DETIK ONLY configuration
         self.sites_config = {
             'detik': {
                 'base_urls': [
-                    'https://news.detik.com/indeks',  # CORRECT: Main index page
+                    'https://news.detik.com/indeks',  # Main index page
                 ],
-                'pagination_pattern': '?page={page}',  # CORRECT: Uses ?page=1, ?page=2, etc
-                'max_pages_per_url': 500,  # CORRECT: Goes up to page 500
+                'pagination_pattern': '?page={page}',  # Uses ?page=1, ?page=2, etc
+                'max_pages_per_url': 500,  # Goes up to page 500
                 'article_selector': 'h3, h2, .media, article',  # Target the headline containers
                 'title_selector': 'a',  # Get the link inside the headline
                 'link_selector': 'a'    # Same as title selector
-            },
-            'kompas': {
-                'base_urls': [
-                    'https://nasional.kompas.com',
-                    'https://regional.kompas.com', 
-                    'https://megapolitan.kompas.com',
-                    'https://internasional.kompas.com',
-                    'https://ekonomi.kompas.com',
-                    'https://bola.kompas.com',
-                    'https://tekno.kompas.com',
-                    'https://otomotif.kompas.com',
-                    'https://lifestyle.kompas.com',
-                    'https://edukasi.kompas.com'
-                ],
-                'pagination_pattern': '/{page}',  # FIXED: Kompas uses /2, /3, etc
-                'max_pages_per_url': 30,
-                'article_selector': '.article__list .article__item, .latest__item',
-                'title_selector': '.article__title a, .latest__title a',
-                'link_selector': '.article__title a, .latest__title a'
             }
         }
         
         # Load existing scraped URLs
         self.load_existing_urls()
+        
+        # Track current position for resume functionality
+        self.current_page = 1
+        self.current_cycle = 0
+        self.last_stop_file = os.path.join(output_dir, "last_stop_position.json")
+        self.load_stop_position()
+    
+    def load_stop_position(self):
+        """Load the last stop position to resume from where we left off"""
+        if os.path.exists(self.last_stop_file):
+            try:
+                with open(self.last_stop_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.current_page = data.get('page', 1)
+                    self.current_cycle = data.get('cycle', 0)
+                    logger.info(f"📍 Resuming from page {self.current_page}, cycle {self.current_cycle}")
+            except Exception as e:
+                logger.warning(f"Could not load stop position: {e}")
+                self.current_page = 1
+                self.current_cycle = 0
+        else:
+            logger.info("📍 Starting from page 1, cycle 0")
+    
+    def save_stop_position(self, page: int, cycle: int):
+        """Save current position for resume functionality"""
+        try:
+            position_data = {
+                'page': page,
+                'cycle': cycle,
+                'timestamp': datetime.now().isoformat(),
+                'total_urls_scraped': len(self.scraped_urls)
+            }
+            with open(self.last_stop_file, 'w', encoding='utf-8') as f:
+                json.dump(position_data, f, indent=2)
+            logger.info(f"📍 Saved stop position: page {page}, cycle {cycle}")
+        except Exception as e:
+            logger.error(f"Could not save stop position: {e}")
     
     def load_existing_urls(self):
         """Load all URLs that have already been scraped from existing JSONL files"""
@@ -103,7 +119,7 @@ class FixedContinuousNewsScraper:
         logger.info(f"Loaded {len(self.scraped_urls)} existing URLs from {len(jsonl_files)} JSONL files")
     
     def discover_urls_from_page(self, url: str, site: str) -> List[Dict]:
-        """Discover article URLs from a single page - FIXED VERSION"""
+        """Discover article URLs from a single page - NO DELAYS"""
         try:
             logger.info(f"🔍 Fetching: {url}")
             response = self.session.get(url, timeout=15)
@@ -167,7 +183,7 @@ class FixedContinuousNewsScraper:
             return []
     
     def discover_new_urls(self, site: str, target_new_articles: int = 100) -> List[Dict]:
-        """Discover new URLs by going DEEP into pagination - FIXED VERSION"""
+        """Discover new URLs by going DEEP into pagination - NO DELAYS"""
         all_new_articles = []
         config = self.sites_config[site]
         
@@ -179,11 +195,11 @@ class FixedContinuousNewsScraper:
                 
             logger.info(f"📄 Searching: {base_url}")
             
-            # Start from page 1 and go DEEP
+            # Start from current page and go DEEP
             consecutive_empty = 0
             max_consecutive_empty = 5  # Allow 5 empty pages before giving up
             
-            for page_num in range(1, config['max_pages_per_url'] + 1):
+            for page_num in range(self.current_page, config['max_pages_per_url'] + 1):
                 if len(all_new_articles) >= target_new_articles:
                     logger.info(f"✅ Target reached! Found {len(all_new_articles)} new articles")
                     break
@@ -207,14 +223,16 @@ class FixedContinuousNewsScraper:
                     logger.info(f"✅ Page {page_num}: Found {len(page_articles)} new articles")
                     all_new_articles.extend(page_articles)
                 
-                # Delay between page requests
-                time.sleep(self.delay_range[0])
+                # Update current page for resume functionality
+                self.current_page = page_num + 1
+                
+                # NO DELAYS - removed time.sleep()
         
         logger.info(f"🎯 Total NEW URLs discovered for {site}: {len(all_new_articles)}")
         return all_new_articles
     
     def scrape_and_save_batch(self, articles: List[Dict], site: str) -> str:
-        """Scrape a batch of articles and save them"""
+        """Scrape a batch of articles and save them - NO DELAYS"""
         if not articles:
             return None
             
@@ -240,8 +258,7 @@ class FixedContinuousNewsScraper:
                 else:
                     logger.warning(f"❌ Failed to extract content from: {article['source_url']}")
                 
-                # Delay between articles
-                time.sleep(self.delay_range[1])
+                # NO DELAYS - removed time.sleep()
                 
             except Exception as e:
                 logger.error(f"Error scraping {article['source_url']}: {e}")
@@ -257,24 +274,24 @@ class FixedContinuousNewsScraper:
             
             filepath = self.jsonl_handler.save_to_jsonl(formatted_articles, filename)
             
-            logger.info(f"💾 Saved {len(formatted_articles)} NEW articles to {filepath}")
+            logger.info(f"�� Saved {len(formatted_articles)} NEW articles to {filepath}")
             return filepath
         
         return None
     
     def run_continuous(self, sites: List[str] = None, batch_size: int = 50, target_per_cycle: int = 100):
-        """Run FIXED continuous scraping that actually finds NEW content"""
+        """Run FIXED continuous scraping - DETIK ONLY, NO DELAYS"""
         if sites is None:
-            sites = ['detik', 'kompas']
+            sites = ['detik']  # DETIK ONLY
         
-        logger.info("🚀 Starting FIXED CONTINUOUS scraping mode...")
+        logger.info("�� Starting FIXED CONTINUOUS scraping mode - DETIK ONLY, NO DELAYS...")
         logger.info(f"🎯 Sites: {sites}")
         logger.info(f"📦 Batch size: {batch_size}")
         logger.info(f"🎯 Target per cycle: {target_per_cycle}")
-        logger.info(f"⏱️  Delay range: {self.delay_range}")
+        logger.info(f"📍 Starting from page: {self.current_page}, cycle: {self.current_cycle}")
         logger.info(f"🛑 Press Ctrl+C to stop")
         
-        cycle_count = 0
+        cycle_count = self.current_cycle
         total_new_articles = 0
         
         try:
@@ -309,10 +326,7 @@ class FixedContinuousNewsScraper:
                         if saved_file:
                             cycle_new_articles += len(batch)
                         
-                        # Delay between batches
-                        if i + batch_size < len(new_articles):
-                            logger.info(f"⏸️  Batch delay...")
-                            time.sleep(10)
+                        # NO DELAYS - removed batch delay
                 
                 # End of cycle summary
                 total_new_articles += cycle_new_articles
@@ -324,50 +338,46 @@ class FixedContinuousNewsScraper:
                 logger.info(f"📊 Total URLs tracked: {len(self.scraped_urls)}")
                 logger.info(f"⏱️  Cycle duration: {cycle_duration:.1f} seconds")
                 
-                if cycle_new_articles == 0:
-                    logger.warning("⚠️  No new articles found this cycle!")
-                    cycle_delay = 1800  # Wait 30 minutes if no new content
-                else:
-                    cycle_delay = 600  # Wait 10 minutes between productive cycles
+                # Save current position
+                self.save_stop_position(self.current_page, cycle_count)
                 
-                logger.info(f"⏰ Waiting {cycle_delay} seconds before next cycle...")
-                time.sleep(cycle_delay)
+                # NO CYCLE DELAYS - removed the 600 second wait
+                logger.info("🔄 Starting next cycle immediately...")
                 
         except KeyboardInterrupt:
-            logger.info(f"\n🛑 Continuous scraping stopped by user")
+            logger.info(f"\n�� Continuous scraping stopped by user")
             logger.info(f"📊 Final stats: {total_new_articles} NEW articles across {cycle_count} cycles")
             logger.info(f"📊 Total URLs in database: {len(self.scraped_urls)}")
+            logger.info(f"📍 Last position saved: page {self.current_page}, cycle {cycle_count}")
+            
+            # Save final position
+            self.save_stop_position(self.current_page, cycle_count)
 
 def main():
-    """Main entry point for FIXED continuous scraper"""
+    """Main entry point for FIXED continuous scraper - DETIK ONLY"""
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="FIXED Continuous Indonesian News Scraper - Actually finds NEW content!"
+        description="FIXED Continuous Indonesian News Scraper - DETIK ONLY, NO DELAYS"
     )
     
-    parser.add_argument('--sites', nargs='+', choices=['detik', 'kompas'], 
-                       default=['detik', 'kompas'], help='Sites to scrape')
+    parser.add_argument('--sites', nargs='+', choices=['detik'], 
+                       default=['detik'], help='Sites to scrape (only detik supported)')
     parser.add_argument('--batch-size', type=int, default=25, 
                        help='Number of articles to process in each batch')
     parser.add_argument('--target-per-cycle', type=int, default=100,
                        help='Target new articles per cycle per site')
-    parser.add_argument('--min-delay', type=float, default=1.0, 
-                       help='Minimum delay between requests')
-    parser.add_argument('--max-delay', type=float, default=3.0, 
-                       help='Maximum delay between requests')
     parser.add_argument('--output-dir', type=str, default='output', 
                        help='Output directory')
     
     args = parser.parse_args()
     
-    # Create FIXED continuous scraper
+    # Create FIXED continuous scraper - NO DELAYS
     continuous_scraper = FixedContinuousNewsScraper(
-        output_dir=args.output_dir,
-        delay_range=(args.min_delay, args.max_delay)
+        output_dir=args.output_dir
     )
     
-    # Start FIXED continuous scraping
+    # Start FIXED continuous scraping - DETIK ONLY
     continuous_scraper.run_continuous(
         sites=args.sites,
         batch_size=args.batch_size,
@@ -375,4 +385,4 @@ def main():
     )
 
 if __name__ == "__main__":
-    main() 
+    main()

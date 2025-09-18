@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple launcher for FIXED continuous Indonesian news scraping
+Simple launcher for FIXED continuous Indonesian news scraping - DETIK ONLY, NO DELAYS
 """
 
 from continuous_scraper_fixed import FixedContinuousNewsScraper
@@ -17,28 +17,28 @@ logging.basicConfig(
 )
 
 def main():
-    print("🚀 FIXED CONTINUOUS INDONESIAN NEWS SCRAPER")
-    print("==========================================")
+    print("🚀 FIXED CONTINUOUS INDONESIAN NEWS SCRAPER - DETIK ONLY")
+    print("======================================================")
+    print("✅ DETIK ONLY - No Kompas scraping")
+    print("✅ NO DELAYS - Maximum speed scraping")
     print("✅ ACTUALLY finds NEW content (not duplicates!)")
-    print("✅ FIXED pagination patterns for Detik & Kompas")
-    print("✅ DEEP page exploration (50+ pages per section)")
-    print("✅ 10+ sections per site for maximum coverage")
+    print("✅ FIXED pagination patterns for Detik")
+    print("✅ DEEP page exploration (500+ pages)")
     print("✅ Smart duplicate avoidance")
     print("Press Ctrl+C to stop")
     print()
     
-    # Create and run FIXED continuous scraper
+    # Create and run FIXED continuous scraper - NO DELAYS
     scraper = FixedContinuousNewsScraper(
-        output_dir="output",
-        delay_range=(1.0, 3.0)  # 1-3 seconds between requests
+        output_dir="output"
     )
     
-    # Start FIXED continuous scraping from both sites
+    # Start FIXED continuous scraping - DETIK ONLY
     scraper.run_continuous(
-        sites=['detik', 'kompas'],  # Both sites
+        sites=['detik'],  # DETIK ONLY
         batch_size=25,  # Process 25 articles at a time
-        target_per_cycle=100  # Try to find 100 new articles per site per cycle
+        target_per_cycle=100  # Try to find 100 new articles per cycle
     )
 
 if __name__ == "__main__":
-    main() 
+    main()
