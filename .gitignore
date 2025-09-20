@@ -24,6 +24,8 @@ wheels/
 id/output/
 */output/
 *.jsonl
+*.json
+
 
 # IDE files
 .vscode/
