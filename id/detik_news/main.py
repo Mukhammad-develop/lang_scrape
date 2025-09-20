@@ -2,6 +2,7 @@
 """
 Detik.com News Scraper
 Scrapes article URLs from Detik.com search results for a given date range
+and extracts title and text content from each article
 """
 
 import sys
@@ -121,6 +122,72 @@ class DetikScraper:
         
         return has_article_indicator and has_article_id
     
+    def extract_article_content(self, article_url):
+        """Extract title and text content from an article URL"""
+        try:
+            print(f"  Extracting content from: {article_url}")
+            response = self.session.get(article_url, timeout=30)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract title
+            title = ""
+            title_selectors = [
+                'h1.detail__title',
+                'h1[class*="title"]',
+                'h1',
+                '.detail__title',
+                '[class*="title"]'
+            ]
+            
+            for selector in title_selectors:
+                title_elem = soup.select_one(selector)
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    break
+            
+            # Extract text content
+            text_content = ""
+            text_selectors = [
+                '.detail__body-text.itp_bodycontent',
+                '.detail__body-text',
+                '.itp_bodycontent',
+                '.detail__body',
+                '[class*="body"]',
+                '.article-content',
+                '.content'
+            ]
+            
+            for selector in text_selectors:
+                text_elem = soup.select_one(selector)
+                if text_elem:
+                    # Remove script and style elements
+                    for script in text_elem(["script", "style", "noscript"]):
+                        script.decompose()
+                    
+                    # Remove ads and non-content elements
+                    for ad in text_elem.find_all(class_=lambda x: x and any(word in x.lower() for word in ['ad', 'ads', 'advertisement', 'banner', 'promo'])):
+                        ad.decompose()
+                    
+                    # Get text content
+                    text_content = text_elem.get_text(separator=' ', strip=True)
+                    
+                    # Clean up the text
+                    text_content = re.sub(r'\s+', ' ', text_content)  # Replace multiple spaces with single space
+                    text_content = re.sub(r'\n+', '\n', text_content)  # Replace multiple newlines with single newline
+                    text_content = text_content.strip()
+                    break
+            
+            return title, text_content
+            
+        except requests.RequestException as e:
+            print(f"    Error fetching article content: {e}")
+            return "", ""
+        except Exception as e:
+            print(f"    Error parsing article content: {e}")
+            return "", ""
+    
     def scrape_articles(self, query, from_date, to_date, max_pages=10):
         """Scrape articles for given date range"""
         print(f"Starting scrape for query: '{query}' from {from_date} to {to_date}")
@@ -141,18 +208,24 @@ class DetikScraper:
             
             print(f"Found {len(article_urls)} articles on page {page}")
             
-            # Create article records
-            for url in article_urls:
+            # Process each article URL to extract content
+            for i, url in enumerate(article_urls, 1):
+                print(f"  Processing article {i}/{len(article_urls)}")
+                title, text_content = self.extract_article_content(url)
+                
                 article_record = {
                     "id": str(uuid.uuid4()),
                     "lang": "id",
                     "source_url": url,
-                    "title": "",  # Will be filled later if needed
-                    "text": "",   # Will be filled later if needed
+                    "title": title,
+                    "text": text_content,
                     "clean_status": "clean",
                     "category": "news"
                 }
                 all_articles.append(article_record)
+                
+                # Small delay between article requests
+                time.sleep(1)
             
             page += 1
             time.sleep(2)  # Be respectful to the server
