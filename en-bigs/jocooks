@@ -1,0 +1,119 @@
+import aiohttp
+import asyncio
+import aiofiles
+import xml.etree.ElementTree as ET
+import uuid
+import json
+from bs4 import BeautifulSoup
+
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; RecipeBot/1.0)"}
+OUTPUT_FILE = "jocooks_recipes.jsonl"
+CONCURRENCY = 10
+
+
+# --------------------------------------
+# Fetch URL
+# --------------------------------------
+async def fetch(session, url):
+    try:
+        async with session.get(url, headers=HEADERS, timeout=30) as resp:
+            if resp.status == 200:
+                return await resp.text()
+    except Exception as e:
+        print(f"❌ Fetch failed {url}: {e}")
+    return None
+
+
+# --------------------------------------
+# Parse sitemap (URL set, not index)
+# --------------------------------------
+async def parse_sitemap(session, sitemap_url):
+    text = await fetch(session, sitemap_url)
+    if not text:
+        return []
+    urls = []
+    try:
+        root = ET.fromstring(text)
+        ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        for loc in root.findall(".//sm:loc", ns):
+            url = loc.text.strip()
+            if "/recipes/" in url:
+                urls.append(url)
+    except Exception as e:
+        print(f"❌ Parse error {sitemap_url}: {e}")
+    return urls
+
+
+# --------------------------------------
+# Parse recipe page (title + text)
+# --------------------------------------
+def parse_recipe_html(html, url):
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Title
+    title_tag = soup.find("h1", class_="entry-title")
+    title = title_tag.get_text(strip=True) if title_tag else ""
+
+    # Text paragraphs
+    content_div = soup.find("div", class_="entry-content single-entry-content")
+    text_blocks = []
+    if content_div:
+        for p in content_div.find_all("p"):
+            t = p.get_text(" ", strip=True)
+            if t:
+                text_blocks.append(t)
+    text = "\n".join(text_blocks)
+
+    return {"title": title, "text": text}
+
+
+# --------------------------------------
+# Save recipe
+# --------------------------------------
+async def save_recipe(recipe, url):
+    if not recipe or not recipe.get("text"):
+        return
+    out = {
+        "id": str(uuid.uuid4()),
+        "lang": "en",
+        "source_url": url,
+        "title": recipe.get("title", ""),
+        "text": recipe.get("text", ""),
+        "clean_status": "clean",
+        "category": "recipe",
+    }
+    async with aiofiles.open(OUTPUT_FILE, "a", encoding="utf-8") as f:
+        await f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+
+# --------------------------------------
+# Crawl JoCooks
+# --------------------------------------
+async def crawl_jocooks():
+    async with aiohttp.ClientSession() as session:
+        # JoCooks has post-sitemap.xml, post-sitemap2.xml, post-sitemap3.xml, ...
+        sitemap_urls = [f"https://www.jocooks.com/post-sitemap{i}.xml" if i > 1 else "https://www.jocooks.com/post-sitemap.xml" for i in range(1, 21)]
+
+        all_urls = []
+        for sm_url in sitemap_urls:
+            urls = await parse_sitemap(session, sm_url)
+            all_urls.extend(urls)
+
+        all_urls = list(set(all_urls))  # deduplicate
+        print(f"📌 Found {len(all_urls)} recipe URLs")
+
+        sem = asyncio.Semaphore(CONCURRENCY)
+
+        async def process(url):
+            async with sem:
+                html = await fetch(session, url)
+                if not html:
+                    return
+                recipe = parse_recipe_html(html, url)
+                await save_recipe(recipe, url)
+
+        await asyncio.gather(*(process(url) for url in all_urls))
+
+
+if __name__ == "__main__":
+    asyncio.run(crawl_jocooks())
