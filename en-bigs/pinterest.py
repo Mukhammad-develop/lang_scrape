@@ -293,10 +293,17 @@ def scrape_keyword(driver, keyword):
 
     seen_urls = set()
     scroll_count = 0
+    idle_streak = 0
 
     while scroll_count < MAX_SCROLLS_PER_KEYWORD:
         time.sleep(SCROLL_PAUSE)
-        pins = driver.find_elements(By.CSS_SELECTOR, "div[data-test-id='pin']")
+
+        # collect current pin elements
+        try:
+            pins = driver.find_elements(By.CSS_SELECTOR, "div[data-test-id='pin']")
+        except Exception as e:
+            print(f"⚠️ Error finding pins: {e}. Will retry this scroll.")
+            pins = []
 
         new_pins = 0
         for pin in pins:
@@ -305,10 +312,16 @@ def scrape_keyword(driver, keyword):
                 if not desc:
                     continue
 
-                link_elem = pin.find_element(By.CSS_SELECTOR, "a")
-                pin_url = link_elem.get_attribute("href")
+                # get pin url
+                try:
+                    link_elem = pin.find_element(By.CSS_SELECTOR, "a")
+                    pin_url = link_elem.get_attribute("href")
+                    if not pin_url:
+                        continue
+                except Exception:
+                    continue
 
-                # ✅ check duplicates
+                # duplicate check
                 if pin_url in seen_urls:
                     continue
 
@@ -329,16 +342,53 @@ def scrape_keyword(driver, keyword):
             except Exception:
                 continue
 
-        # if nothing new → stop this keyword early
+        # ✅ if no new pins, wait 1s extra and try again before marking idle
         if new_pins == 0:
-            print(f"⚠️ No new pins after scroll {scroll_count}, ending search for '{keyword}'")
-            break
+            time.sleep(1)  # give pins extra time to load
+            pins_retry = driver.find_elements(By.CSS_SELECTOR, "div[data-test-id='pin']")
+            for pin in pins_retry:
+                try:
+                    desc = pin.text.strip()
+                    if not desc:
+                        continue
+                    link_elem = pin.find_element(By.CSS_SELECTOR, "a")
+                    pin_url = link_elem.get_attribute("href")
+                    if not pin_url or pin_url in seen_urls:
+                        continue
+                    seen_urls.add(pin_url)
+                    new_pins += 1
+                    record = {
+                        "id": str(uuid.uuid4()),
+                        "lang": "en",
+                        "source_url": pin_url,
+                        "title": "",
+                        "text": desc,
+                        "clean_status": "pending",
+                        "category": keyword
+                    }
+                    save_jsonl(record)
+                except Exception:
+                    continue
 
-        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+        # handle idle streak
+        if new_pins > 0:
+            idle_streak = 0
+            print(f"   Scrolled {scroll_count+1} times for '{keyword}', saved {new_pins} new pins (total unique: {len(seen_urls)})")
+        else:
+            idle_streak += 1
+            print(f"   Scrolled {scroll_count+1} times for '{keyword}', found 0 new pins (idle {idle_streak}/{MAX_IDLE_RETRIES})")
+            if idle_streak >= MAX_IDLE_RETRIES:
+                print(f"⚠️ No new pins after {MAX_IDLE_RETRIES} consecutive attempts — ending search for '{keyword}'")
+                break
+
+        # scroll further
+        try:
+            driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+        except Exception:
+            pass
         time.sleep(2)
 
         scroll_count += 1
-        print(f"   Scrolled {scroll_count} times for '{keyword}', saved {new_pins} new pins")
 
     print(f"✅ Finished keyword '{keyword}', total unique pins: {len(seen_urls)}")
 
