@@ -275,6 +275,7 @@ KEYWORDS = [
 OUTPUT_FILE = "pinterest_recipes.jsonl"
 SCROLL_PAUSE = 3
 MAX_SCROLLS_PER_KEYWORD = 1000
+MAX_IDLE_RETRIES = 5
 
 def init_driver():
     chrome_options = Options()
